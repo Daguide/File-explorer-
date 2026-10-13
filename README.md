@@ -22,7 +22,14 @@ dotnet run --project src/LiteExplorer
 dotnet publish src/LiteExplorer -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o out
 ```
 
-On peut aussi ouvrir `LiteExplorer.sln` dans Visual Studio 2022. La CI GitHub (`.github/workflows/build.yml`)
+On peut aussi ouvrir `LiteExplorer.sln` dans Visual Studio 2022.
+
+Sortie de compilation (réglée dans `Directory.Build.props`, à la racine de la solution) :
+
+| Commande | Résultat |
+|---|---|
+| Build Debug / Release (VS ou `dotnet build`) | `bin\Debug\` ou `bin\Release\` → `LiteExplorer.exe` + ses fichiers |
+| `dotnet publish` (commande ci-dessus, sans `-o`) | `bin\Release\publish\LiteExplorer.exe` (fichier unique) | La CI GitHub (`.github/workflows/build.yml`)
 produit `LiteExplorer.exe` à chaque push (onglet *Actions* → artefact `LiteExplorer-win-x64`).
 
 ## Raccourcis

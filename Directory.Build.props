@@ -1,0 +1,13 @@
+<Project>
+  <!--
+    Sortie à la racine de la solution, comme les anciens projets Visual Studio :
+      bin\Debug\LiteExplorer.exe
+      bin\Release\LiteExplorer.exe
+    (sans les sous-dossiers net8.0-windows\ et win-x64\ ajoutés par défaut).
+  -->
+  <PropertyGroup>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)bin\</BaseOutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+  </PropertyGroup>
+</Project>
