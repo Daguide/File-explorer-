@@ -3,8 +3,10 @@
 Remplaçant léger de l'Explorateur Windows, écrit en C# (WinForms, .NET 8).
 
 - **Double panneau** côte à côte (Tab pour passer de l'un à l'autre)
-- **Onglets façon fureteur Web** dans chaque panneau : `+`, `×`, clic milieu, Ctrl+T / Ctrl+W / Ctrl+Maj+T
-- **Barre de favoris** : clic pour ouvrir, clic milieu pour un nouvel onglet, glisser un dossier dessus pour l'ajouter
+- **Onglets façon fureteur Web** dans chaque panneau : largeur selon le nom du dossier, icône, `+`, `×`,
+  clic milieu, glisser pour réordonner, Ctrl+T / Ctrl+W / Ctrl+Maj+T
+- **Plusieurs barres de favoris** (ex. « Projets », « Clients ») : clic pour ouvrir, clic milieu pour un nouvel
+  onglet, glisser un dossier dessus pour l'ajouter, déplacer un favori d'une barre à l'autre
 - **Thème clair / sombre** (ou selon Windows) : menu *Affichage → Thème*
 - **Aucune dépendance externe** : seulement .NET et les API de Windows. Pas de DLL tierce, pas de télémétrie,
   pas d'accès réseau. Tout le code est là, lisible (contrairement à Clover…).
@@ -68,6 +70,14 @@ y compris quand il change pendant que l'app est ouverte), *Clair* ou *Sombre*. L
 En sombre : barre de titre, onglets, en-têtes de colonnes, barres de défilement et menus sont sombres
 (Windows 10 1809 ou plus récent).
 
+## Barres de favoris
+
+- Le bouton **☆ Nom** au début de chaque barre (ou clic droit dans le vide de la barre) : ajouter le dossier
+  courant, nouvelle barre, renommer, monter/descendre, masquer, supprimer.
+- Menu **Favoris** : ajouter le dossier courant, nouvelle barre, afficher/masquer chaque barre.
+- La première barre affichée est la barre par défaut : Ctrl+D y ajoute le dossier courant, Ctrl+1…9 ouvre ses favoris.
+- Clic droit sur un favori : renommer, réordonner, **déplacer vers une autre barre**, supprimer.
+
 ## Réglages
 
 Favoris, onglets ouverts, taille de la fenêtre, etc. sont enregistrés dans
@@ -106,5 +116,4 @@ Windows Registry Editor Version 5.00
 
 - Menu contextuel complet de Windows (7-Zip, Git, etc.) via `IContextMenu`
 - Fil d'Ariane cliquable dans la barre d'adresse
-- Réorganiser les onglets par glisser-déposer
 - Aperçu des images / fichiers texte

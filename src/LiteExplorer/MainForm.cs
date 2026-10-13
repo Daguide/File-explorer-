@@ -6,7 +6,7 @@ internal sealed class MainForm : Form, IExplorerHost, IThemed
 {
     readonly AppSettings settings;
     readonly string[] args;
-    readonly FavoritesBar favorites;
+    readonly FavoritesArea favorites;
     readonly SplitContainer split;
     readonly FilePane left, right;
     FilePane active;
@@ -28,7 +28,7 @@ internal sealed class MainForm : Form, IExplorerHost, IThemed
         right = new FilePane(this) { Dock = DockStyle.Fill };
         active = left;
 
-        favorites = new FavoritesBar(settings.Favorites) { Dock = DockStyle.Top };
+        favorites = new FavoritesArea(settings.FavoriteBars);
         favorites.OpenRequested += (path, newTab) =>
         {
             if (newTab) active.AddTab(path, select: !ModifierKeys.HasFlag(Keys.Shift));
@@ -138,7 +138,25 @@ internal sealed class MainForm : Form, IExplorerHost, IThemed
         });
         view.DropDownOpening += (_, _) => hidden.Checked = AppState.ShowHidden;
 
-        menu.Items.AddRange(new ToolStripItem[] { file, view });
+        var favMenu = new ToolStripMenuItem("F&avoris");
+        favMenu.DropDownOpening += (_, _) =>
+        {
+            favMenu.DropDownItems.Clear();
+            favMenu.DropDownItems.Add(Item("Ajouter le dossier courant", "Ctrl+D", () => { if (V != null) AddFavorite(V.CurrentPath); }));
+            favMenu.DropDownItems.Add(Item("Nouvelle barre de favoris…", null, favorites.NewBar));
+            favMenu.DropDownItems.Add(new ToolStripSeparator());
+            favMenu.DropDownItems.Add(new ToolStripMenuItem("Barres affichées :") { Enabled = false });
+            foreach (var bar in favorites.Bars)
+            {
+                var b = bar;
+                var it = new ToolStripMenuItem(bar.Name) { Checked = bar.Visible };
+                it.Click += (_, _) => favorites.SetBarVisible(b, !b.Visible);
+                favMenu.DropDownItems.Add(it);
+            }
+        };
+        favMenu.DropDownItems.Add(new ToolStripMenuItem("…")); // sinon le menu vide ne s'ouvre pas
+
+        menu.Items.AddRange(new ToolStripItem[] { file, view, favMenu });
         return menu;
     }
 
@@ -184,7 +202,7 @@ internal sealed class MainForm : Form, IExplorerHost, IThemed
         if (pane.Current is { } v) ViewPathChanged(v);
     }
 
-    public void AddFavorite(string path) => favorites.Add(path);
+    public void AddFavorite(string path) => favorites.AddFavorite(path);
 
     public void ToggleHidden()
     {
@@ -302,7 +320,7 @@ internal sealed class MainForm : Form, IExplorerHost, IThemed
         settings.RightIndex = right.SelectedIndex;
         settings.ShowHidden = AppState.ShowHidden;
         settings.Theme = ThemeManager.Mode.ToString();
-        settings.Favorites = favorites.Favorites;
+        settings.FavoriteBars = favorites.Bars;
         settings.SplitRatio = split.Width > 0 ? (double)split.SplitterDistance / split.Width : 0.5;
         var b = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
         (settings.WinX, settings.WinY, settings.WinW, settings.WinH) = (b.X, b.Y, b.Width, b.Height);

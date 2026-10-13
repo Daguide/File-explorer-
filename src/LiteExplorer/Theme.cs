@@ -17,6 +17,10 @@ internal sealed class Theme
     public required Color Accent { get; init; }
     public required Color Hover { get; init; }
     public required Color Pressed { get; init; }
+    public required Color ListFore { get; init; }             // texte des fichiers
+    public required Color SelectionBack { get; init; }        // ligne sélectionnée (liste active)
+    public required Color SelectionInactiveBack { get; init; } // ligne sélectionnée (autre panneau)
+    public required Color SelectionFore { get; init; }
 
     public static readonly Theme Light = new()
     {
@@ -31,6 +35,10 @@ internal sealed class Theme
         Accent = SystemColors.Highlight,
         Hover = Color.FromArgb(229, 243, 255),
         Pressed = Color.FromArgb(204, 232, 255),
+        ListFore = SystemColors.WindowText,
+        SelectionBack = Color.FromArgb(204, 232, 255),
+        SelectionInactiveBack = Color.FromArgb(217, 217, 217),
+        SelectionFore = SystemColors.WindowText,
     };
 
     public static readonly Theme DarkTheme = new()
@@ -46,6 +54,10 @@ internal sealed class Theme
         Accent = Color.FromArgb(0, 120, 215),
         Hover = Color.FromArgb(62, 62, 62),
         Pressed = Color.FromArgb(80, 80, 80),
+        ListFore = Color.FromArgb(0x2B, 0x86, 0xFF),
+        SelectionBack = Color.FromArgb(0x1B, 0x64, 0xDF), // un peu plus foncé : texte blanc lisible
+        SelectionInactiveBack = Color.FromArgb(70, 70, 70),
+        SelectionFore = Color.White,
     };
 }
 

@@ -16,10 +16,8 @@ internal sealed class FileListView : ListView
     public FileListView()
     {
         DoubleBuffered = true;
-        // On dessine nous-mêmes les en-têtes (pour le thème sombre), le reste reste natif.
+        // En-têtes et lignes dessinés par nous (couleurs du thème) ; voir FolderView pour les lignes.
         OwnerDraw = true;
-        DrawItem += (_, e) => e.DrawDefault = true;
-        DrawSubItem += (_, e) => e.DrawDefault = true;
         DrawColumnHeader += OnDrawHeader;
         HandleCreated += (_, _) => ApplyNativeTheme();
     }
@@ -98,6 +96,7 @@ internal sealed class FolderView : UserControl, IThemed
     int sortColumn;
     bool sortAsc = true;
     bool initialized, editing, statusPending, suppressFilter, dirty, isActive;
+    int hotRow = -1;
     string filterText = "";
     Regex? filterRegex;
 
@@ -186,6 +185,12 @@ internal sealed class FolderView : UserControl, IThemed
 
         list.EmptyAreaDoubleClick += (_, _) => GoUp(); // double-clic dans le vide = dossier parent
         list.RetrieveVirtualItem += OnRetrieveItem;
+        list.DrawItem += OnDrawRow;
+        list.DrawSubItem += OnDrawCell;
+        list.MouseMove += (_, e) => SetHotRow(list.HitTest(e.Location).Item?.Index ?? -1);
+        list.MouseLeave += (_, _) => SetHotRow(-1);
+        list.GotFocus += (_, _) => list.Invalidate(); // couleur de sélection active / inactive
+        list.LostFocus += (_, _) => list.Invalidate();
         list.SearchForVirtualItem += OnSearchItem;
         list.ColumnClick += OnColumnClick;
         list.KeyDown += ListKeyDown;
@@ -628,6 +633,64 @@ internal sealed class FolderView : UserControl, IThemed
         item.SubItems.Add(en.Modified is DateTime d ? d.ToString("g") : "");
         if ((en.Attributes & FileAttributes.Hidden) != 0) item.ForeColor = ThemeManager.Current.Gray;
         e.Item = item;
+    }
+
+    // --- Dessin des lignes ---------------------------------------------------
+
+    void SetHotRow(int index)
+    {
+        if (index == hotRow) return;
+        int old = hotRow;
+        hotRow = index;
+        InvalidateRow(old);
+        InvalidateRow(index);
+    }
+
+    void InvalidateRow(int index)
+    {
+        if (index < 0 || index >= list.VirtualListSize) return;
+        var r = list.GetItemRect(index);
+        list.Invalidate(new Rectangle(0, r.Y, list.ClientSize.Width, r.Height));
+    }
+
+    (Color back, Color fore) RowColors(int index, bool selected)
+    {
+        var t = ThemeManager.Current;
+        if (selected) return (list.Focused ? t.SelectionBack : t.SelectionInactiveBack, t.SelectionFore);
+        bool hidden = index < view.Count && (view[index].Attributes & FileAttributes.Hidden) != 0;
+        return (index == hotRow ? t.Hover : t.Back, hidden ? t.Gray : t.ListFore);
+    }
+
+    void OnDrawRow(object? sender, DrawListViewItemEventArgs e)
+    {
+        var (back, _) = RowColors(e.ItemIndex, e.Item.Selected);
+        using var brush = new SolidBrush(back);
+        e.Graphics.FillRectangle(brush, e.Bounds);
+    }
+
+    void OnDrawCell(object? sender, DrawListViewSubItemEventArgs e)
+    {
+        if (e.Item == null) return;
+        var (back, fore) = RowColors(e.ItemIndex, e.Item.Selected);
+        var g = e.Graphics;
+        var r = e.Bounds;
+        // Particularité WinForms : pour la colonne 0, Bounds couvre toute la ligne.
+        if (e.ColumnIndex == 0) r.Width = list.Columns[0].Width;
+        using (var brush = new SolidBrush(back)) g.FillRectangle(brush, r);
+
+        int x = r.X + 4;
+        if (e.ColumnIndex == 0)
+        {
+            var size = ShellIcons.List.ImageSize;
+            if (e.Item.ImageIndex >= 0)
+                ShellIcons.List.Draw(g, x, r.Y + (r.Height - size.Height) / 2, e.Item.ImageIndex);
+            x += size.Width + 4;
+        }
+        var textRect = new Rectangle(x, r.Y, Math.Max(0, r.Right - x - 4), r.Height);
+        var align = list.Columns[e.ColumnIndex].TextAlign == HorizontalAlignment.Right ? TextFormatFlags.Right : TextFormatFlags.Left;
+        TextRenderer.DrawText(g, e.SubItem?.Text, list.Font, textRect, fore,
+            align | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis |
+            TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
     }
 
     // Recherche par frappe : taper « doc » saute au premier élément qui commence par « doc ».

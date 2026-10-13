@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace LiteExplorer;
 
@@ -13,13 +14,23 @@ internal sealed class Favorite
     public string Path { get; set; } = "";
 }
 
+internal sealed class FavoriteBarData
+{
+    public string Name { get; set; } = "Favoris";
+    public bool Visible { get; set; } = true;
+    public List<Favorite> Items { get; set; } = new();
+}
+
 /// <summary>
 /// Réglages persistés en JSON dans %AppData%\LiteExplorer\settings.json,
 /// ou à côté de l'exécutable si un fichier LiteExplorer.json y existe (mode portable).
 /// </summary>
 internal sealed class AppSettings
 {
-    public List<Favorite> Favorites { get; set; } = new();
+    public List<FavoriteBarData> FavoriteBars { get; set; } = new();
+    /// <summary>Ancien format (une seule barre) : lu pour la migration, plus écrit.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<Favorite>? Favorites { get; set; }
     public List<string> LeftTabs { get; set; } = new();
     public int LeftIndex { get; set; }
     public List<string> RightTabs { get; set; } = new();
@@ -52,10 +63,18 @@ internal sealed class AppSettings
         {
             var path = FilePath;
             if (File.Exists(path) && JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) is { } s)
-                return s;
+                return s.Migrated();
         }
         catch { /* fichier corrompu : on repart des valeurs par défaut */ }
-        return new AppSettings { Favorites = DefaultFavorites() };
+        return new AppSettings { Favorites = DefaultFavorites() }.Migrated();
+    }
+
+    AppSettings Migrated()
+    {
+        if (FavoriteBars.Count == 0)
+            FavoriteBars.Add(new FavoriteBarData { Name = "Favoris", Items = Favorites ?? DefaultFavorites() });
+        Favorites = null;
+        return this;
     }
 
     public void Save()
