@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <AssemblyName>LiteExplorer</AssemblyName>
+    <RootNamespace>LiteExplorer</RootNamespace>
+    <SatelliteResourceLanguages>fr;en</SatelliteResourceLanguages>
+    <Version>0.1.0</Version>
+    <Product>LiteExplorer</Product>
+    <Description>Explorateur de fichiers léger : double panneau, onglets, favoris.</Description>
+  </PropertyGroup>
+
+</Project>
