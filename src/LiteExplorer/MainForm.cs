@@ -2,12 +2,24 @@ using Microsoft.Win32;
 
 namespace LiteExplorer;
 
+internal enum TreeMode { None, Shared, PerPane }
+
 internal sealed class MainForm : Form, IExplorerHost, IThemed
 {
     readonly AppSettings settings;
     readonly string[] args;
     readonly FavoritesArea favorites;
     readonly SplitContainer split;
+    // [arbre commun (optionnel)] | [panneau gauche | panneau droit]
+    readonly SplitContainer treeSplit = new()
+    {
+        Dock = DockStyle.Fill,
+        FixedPanel = FixedPanel.Panel1,
+        Panel1Collapsed = true,
+        SplitterWidth = 5,
+    };
+    FolderTree? sharedTree;
+    TreeMode treeMode = TreeMode.None;
     readonly FilePane left, right;
     FilePane active;
 
@@ -43,7 +55,8 @@ internal sealed class MainForm : Form, IExplorerHost, IThemed
         split.Panel2.Controls.Add(right);
         split.DoubleClick += (_, _) => split.SplitterDistance = split.Width / 2; // double-clic = 50/50
 
-        Controls.Add(split);
+        treeSplit.Panel2.Controls.Add(split);
+        Controls.Add(treeSplit);
         Controls.Add(BuildFunctionBar());
         Controls.Add(favorites);
         Controls.Add(BuildMenu());
@@ -127,10 +140,29 @@ internal sealed class MainForm : Form, IExplorerHost, IThemed
         };
 
         var hidden = Item("Fichiers cachés", "Ctrl+H", ToggleHidden);
+        var treeMenu = new ToolStripMenuItem("&Arborescence");
+        foreach (var (label, m) in new[]
+                 {
+                     ("Masquée", TreeMode.None),
+                     ("Une seule, à gauche des panneaux", TreeMode.Shared),
+                     ("Une par panneau", TreeMode.PerPane),
+                 })
+        {
+            var it = new ToolStripMenuItem(label) { Tag = m };
+            it.Click += (_, _) => SetTreeMode(m);
+            treeMenu.DropDownItems.Add(it);
+        }
+        treeMenu.DropDownOpening += (_, _) =>
+        {
+            foreach (ToolStripMenuItem it in treeMenu.DropDownItems)
+                it.Checked = (TreeMode)it.Tag! == treeMode;
+        };
+
         var view = new ToolStripMenuItem("&Affichage");
         view.DropDownItems.AddRange(new ToolStripItem[]
         {
             themeMenu,
+            treeMenu,
             new ToolStripSeparator(),
             hidden,
             Item("Échanger les panneaux", "Ctrl+U", SwapPanes),
@@ -167,6 +199,7 @@ internal sealed class MainForm : Form, IExplorerHost, IThemed
     public void OnThemeChanged(Theme theme)
     {
         split.BackColor = theme.Border; // couleur du séparateur
+        treeSplit.BackColor = theme.Border;
         if (IsHandleCreated) NativeMethods.SetDarkTitleBar(Handle, theme.Dark);
     }
 
@@ -191,6 +224,7 @@ internal sealed class MainForm : Form, IExplorerHost, IThemed
 
     // --- IExplorerHost -------------------------------------------------------
 
+    public FilePane ActivePane => active;
     public FilePane OtherPane(FilePane pane) => pane == left ? right : left;
 
     public void SetActivePane(FilePane pane)
@@ -208,11 +242,42 @@ internal sealed class MainForm : Form, IExplorerHost, IThemed
     {
         AppState.ShowHidden = !AppState.ShowHidden;
         foreach (var v in left.Views.Concat(right.Views)) v.ReloadView();
+        sharedTree?.Build();
+        left.RebuildTree();
+        right.RebuildTree();
+        if (V != null) sharedTree?.SyncTo(V.CurrentPath);
     }
 
     public void ViewPathChanged(FolderView view)
     {
-        if (view == active.Current) Text = $"{view.DisplayPath} — {Dialogs.AppName}";
+        if (view != active.Current) return;
+        Text = $"{view.DisplayPath} — {Dialogs.AppName}";
+        if (treeMode == TreeMode.Shared) sharedTree?.SyncTo(view.CurrentPath);
+    }
+
+    // --- Arborescence ----------------------------------------------------------
+
+    void SetTreeMode(TreeMode mode)
+    {
+        // On mémorise les largeurs actuelles avant de changer de disposition.
+        if (treeMode == TreeMode.Shared) settings.SharedTreeWidth = treeSplit.SplitterDistance;
+        if (treeMode == TreeMode.PerPane) settings.PaneTreeWidth = left.TreeWidth;
+
+        treeMode = mode;
+        if (mode == TreeMode.Shared && sharedTree == null)
+        {
+            sharedTree = new FolderTree(this, null) { Dock = DockStyle.Fill };
+            treeSplit.Panel1.Controls.Add(sharedTree);
+            ThemeManager.Apply(sharedTree);
+        }
+        treeSplit.Panel1Collapsed = mode != TreeMode.Shared;
+        if (mode == TreeMode.Shared)
+        {
+            Dialogs.SetSplitter(treeSplit, settings.SharedTreeWidth);
+            if (V != null) sharedTree!.SyncTo(V.CurrentPath);
+        }
+        left.ShowTree(mode == TreeMode.PerPane, settings.PaneTreeWidth);
+        right.ShowTree(mode == TreeMode.PerPane, settings.PaneTreeWidth);
     }
 
     // --- Raccourcis globaux ---------------------------------------------------
@@ -292,6 +357,7 @@ internal sealed class MainForm : Form, IExplorerHost, IThemed
         RestoreTabs(left, settings.LeftTabs, settings.LeftIndex,
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
         RestoreTabs(right, settings.RightTabs, settings.RightIndex, "");
+        SetTreeMode(Enum.TryParse<TreeMode>(settings.TreeMode, out var tm) ? tm : TreeMode.None);
 
         // Chemins passés en ligne de commande (ex. LiteExplorer.exe "D:\Projets" ou /select,C:\fichier.txt)
         foreach (var raw in args)
@@ -320,6 +386,9 @@ internal sealed class MainForm : Form, IExplorerHost, IThemed
         settings.RightIndex = right.SelectedIndex;
         settings.ShowHidden = AppState.ShowHidden;
         settings.Theme = ThemeManager.Mode.ToString();
+        settings.TreeMode = treeMode.ToString();
+        if (treeMode == TreeMode.Shared) settings.SharedTreeWidth = treeSplit.SplitterDistance;
+        if (treeMode == TreeMode.PerPane) settings.PaneTreeWidth = left.TreeWidth;
         settings.FavoriteBars = favorites.Bars;
         settings.SplitRatio = split.Width > 0 ? (double)split.SplitterDistance / split.Width : 0.5;
         var b = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;

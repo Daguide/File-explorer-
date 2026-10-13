@@ -7,6 +7,7 @@ Remplaçant léger de l'Explorateur Windows, écrit en C# (WinForms, .NET 8).
   clic milieu, glisser pour réordonner, Ctrl+T / Ctrl+W / Ctrl+Maj+T
 - **Plusieurs barres de favoris** (ex. « Projets », « Clients ») : clic pour ouvrir, clic milieu pour un nouvel
   onglet, glisser un dossier dessus pour l'ajouter, déplacer un favori d'une barre à l'autre
+- **Arborescence des dossiers** optionnelle : une seule à gauche (suit le panneau actif) ou une par panneau
 - **Thème clair / sombre** (ou selon Windows) : menu *Affichage → Thème*
 - **Aucune dépendance externe** : seulement .NET et les API de Windows. Pas de DLL tierce, pas de télémétrie,
   pas d'accès réseau. Tout le code est là, lisible (contrairement à Clover…).
@@ -70,6 +71,18 @@ y compris quand il change pendant que l'app est ouverte), *Clair* ou *Sombre*. L
 En sombre : barre de titre, onglets, en-têtes de colonnes, barres de défilement et menus sont sombres
 (Windows 10 1809 ou plus récent).
 
+## Arborescence
+
+Menu **Affichage → Arborescence** :
+
+- **Masquée** (par défaut)
+- **Une seule, à gauche des panneaux** : elle pilote le panneau actif et suit ses changements de dossier
+- **Une par panneau** : chaque panneau a son arbre, qui suit l'onglet affiché
+
+L'arbre se déplie de lui-même jusqu'au dossier courant. Clic = ouvrir, clic milieu = nouvel onglet en
+arrière-plan, clic droit = autre panneau, favoris, actualiser, propriétés. On peut aussi déposer des fichiers
+sur un dossier de l'arbre (mêmes règles copier/déplacer que dans la liste). Le mode et la largeur sont mémorisés.
+
 ## Barres de favoris
 
 - Le bouton **☆ Nom** au début de chaque barre (ou clic droit dans le vide de la barre) : ajouter le dossier
@@ -105,7 +118,8 @@ Windows Registry Editor Version 5.00
 | `MainForm.cs` | Fenêtre : favoris, deux panneaux, barre de touches F, raccourcis globaux, sauvegarde |
 | `FilePane.cs` | Un panneau = une rangée d'onglets dessinés à la main (`+`, `×`) |
 | `FolderView.cs` | Contenu d'un onglet : adresse, filtre, liste virtuelle, historique, glisser-déposer, menus |
-| `FavoritesBar.cs` | Barre de favoris |
+| `FavoritesBar.cs` | Barres de favoris |
+| `FolderTree.cs` | Arborescence des dossiers (chargée à la demande) |
 | `FileOps.cs` | Copier / déplacer / supprimer via les dialogues natifs |
 | `ShellIcons.cs` | Icônes et types de fichiers système, mis en cache |
 | `Theme.cs` | Palettes clair/sombre, application du thème, rendu sombre des menus |

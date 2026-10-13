@@ -38,6 +38,10 @@ internal sealed class AppSettings
     public bool ShowHidden { get; set; }
     /// <summary>System, Light ou Dark.</summary>
     public string Theme { get; set; } = "System";
+    /// <summary>None, Shared (une arborescence commune) ou PerPane (une par panneau).</summary>
+    public string TreeMode { get; set; } = "None";
+    public int SharedTreeWidth { get; set; } = 240;
+    public int PaneTreeWidth { get; set; } = 200;
     public double SplitRatio { get; set; } = 0.5;
     public int WinX { get; set; }
     public int WinY { get; set; }

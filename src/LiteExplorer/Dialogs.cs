@@ -2,6 +2,7 @@ namespace LiteExplorer;
 
 internal interface IExplorerHost
 {
+    FilePane ActivePane { get; }
     FilePane OtherPane(FilePane pane);
     void SetActivePane(FilePane pane);
     void AddFavorite(string path);
@@ -35,6 +36,14 @@ internal static class Dialogs
         form.AcceptButton = ok;
         form.CancelButton = cancel;
         return form.ShowDialog(owner) == DialogResult.OK ? box.Text : null;
+    }
+
+    /// <summary>Fixe la position d'un séparateur sans lever d'exception si la place manque.</summary>
+    public static void SetSplitter(SplitContainer split, int distance)
+    {
+        int max = split.Width - split.Panel2MinSize - split.SplitterWidth;
+        if (max <= split.Panel1MinSize) return;
+        try { split.SplitterDistance = Math.Clamp(distance, split.Panel1MinSize, max); } catch { }
     }
 
     public static void Error(IWin32Window? owner, string message) =>

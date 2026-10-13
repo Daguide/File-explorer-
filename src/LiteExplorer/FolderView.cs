@@ -1110,25 +1110,7 @@ internal sealed class FolderView : UserControl, IThemed
         if (files.Length == 0) return DragDropEffects.None;
         target = DropTarget(e);
         if (target == null) return DragDropEffects.None;
-        foreach (var f in files)
-        {
-            var src = f.TrimEnd('\\');
-            if (FileEntry.PathEquals(src, target) || target.StartsWith(src + "\\", StringComparison.OrdinalIgnoreCase))
-                return DragDropEffects.None; // on ne dépose pas un dossier dans lui-même
-        }
-        var dest = target;
-        if (files.All(f => FileEntry.PathEquals(Path.GetDirectoryName(f), dest))) return DragDropEffects.None;
-
-        bool sameVolume = string.Equals(Path.GetPathRoot(files[0]), Path.GetPathRoot(target), StringComparison.OrdinalIgnoreCase);
-        // Ctrl = copier, Maj = déplacer, sinon comme l'Explorateur : déplacer sur le même volume.
-        var want = (e.KeyState & 8) != 0 ? DragDropEffects.Copy
-                 : (e.KeyState & 4) != 0 ? DragDropEffects.Move
-                 : sameVolume ? DragDropEffects.Move : DragDropEffects.Copy;
-        if ((e.AllowedEffect & want) == 0)
-            want = e.AllowedEffect.HasFlag(DragDropEffects.Copy) ? DragDropEffects.Copy
-                 : e.AllowedEffect.HasFlag(DragDropEffects.Move) ? DragDropEffects.Move
-                 : DragDropEffects.None;
-        return want;
+        return FileOps.DropEffect(files, target, e.KeyState, e.AllowedEffect);
     }
 
     void OnDragOver(object? sender, DragEventArgs e) => e.Effect = ComputeEffect(e, out _, out _);

@@ -10,6 +10,14 @@ internal sealed class FilePane : UserControl, IThemed
     readonly IExplorerHost host;
     readonly TabStrip strip;
     readonly Panel content = new() { Dock = DockStyle.Fill };
+    readonly SplitContainer treeSplit = new()
+    {
+        Dock = DockStyle.Fill,
+        FixedPanel = FixedPanel.Panel1,
+        Panel1Collapsed = true,
+        SplitterWidth = 4,
+    };
+    FolderTree? tree;
     readonly List<FolderView> views = new();
     readonly ContextMenuStrip tabMenu = new();
     readonly Stack<string> closedTabs = new();
@@ -20,8 +28,10 @@ internal sealed class FilePane : UserControl, IThemed
     {
         this.host = host;
         strip = new TabStrip(this) { Dock = DockStyle.Top };
-        Controls.Add(content);
-        Controls.Add(strip);
+        // [arbre (optionnel)] | [onglets + contenu]
+        treeSplit.Panel2.Controls.Add(content);
+        treeSplit.Panel2.Controls.Add(strip);
+        Controls.Add(treeSplit);
 
         AddMenu("Nouvel onglet", "Ctrl+T", NewTab);
         AddMenu("Dupliquer l'onglet", null, () =>
@@ -72,7 +82,42 @@ internal sealed class FilePane : UserControl, IThemed
         }
     }
 
-    public void OnThemeChanged(Theme theme) => strip.Invalidate();
+    public void OnThemeChanged(Theme theme)
+    {
+        treeSplit.BackColor = theme.Border; // couleur du séparateur
+        strip.Invalidate();
+    }
+
+    // --- Arborescence propre à ce panneau ------------------------------------
+
+    public bool TreeVisible => !treeSplit.Panel1Collapsed;
+    public int TreeWidth => treeSplit.SplitterDistance;
+
+    public void ShowTree(bool show, int width)
+    {
+        if (show && tree == null)
+        {
+            tree = new FolderTree(host, this) { Dock = DockStyle.Fill };
+            treeSplit.Panel1.Controls.Add(tree);
+            ThemeManager.Apply(tree);
+        }
+        treeSplit.Panel1Collapsed = !show;
+        if (!show) return;
+        Dialogs.SetSplitter(treeSplit, width);
+        if (current != null) tree!.SyncTo(current.CurrentPath);
+    }
+
+    public void RebuildTree()
+    {
+        if (tree == null) return;
+        tree.Build();
+        if (current != null) tree.SyncTo(current.CurrentPath);
+    }
+
+    void SyncTree()
+    {
+        if (tree != null && TreeVisible && current != null) tree.SyncTo(current.CurrentPath);
+    }
 
     internal void Activate() => host.SetActivePane(this);
 
@@ -85,7 +130,9 @@ internal sealed class FilePane : UserControl, IThemed
         view.PathChanged += (_, _) =>
         {
             strip.Relayout();
-            if (view == current) host.ViewPathChanged(view);
+            if (view != current) return;
+            SyncTree();
+            host.ViewPathChanged(view);
         };
         views.Insert(index < 0 || index > views.Count ? views.Count : index, view);
         content.Controls.Add(view);
@@ -106,6 +153,7 @@ internal sealed class FilePane : UserControl, IThemed
         view.BringToFront();
         if (old != null) old.Visible = false;
         strip.Relayout();
+        SyncTree();
         host.ViewPathChanged(view);
     }
 
