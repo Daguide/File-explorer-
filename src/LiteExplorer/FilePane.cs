@@ -114,6 +114,7 @@ internal sealed class FilePane : UserControl
         suppress = true;
         tabs.TabPages.Insert(at, page);
         suppress = false;
+        tabs.Invalidate();
 
         if (!view.Navigate(path, addHistory: false, quiet: quiet)) view.Navigate("", addHistory: false);
         if (select || Current == null) tabs.SelectedTab = page;
@@ -194,6 +195,9 @@ internal sealed class FilePane : UserControl
 
     void DrawTab(object? sender, DrawItemEventArgs e)
     {
+        // Pendant TabPages.Insert, Windows peut demander à dessiner un onglet natif
+        // que la collection .NET ne contient pas encore : on l'ignore, on redessinera après.
+        if (e.Index < 0 || e.Index >= tabs.TabPages.Count) return;
         var page = tabs.TabPages[e.Index];
         var r = tabs.GetTabRect(e.Index);
         bool selected = e.Index == tabs.SelectedIndex;
