@@ -13,10 +13,21 @@ internal sealed class FavoritesArea : Panel
     public event Action<string>? OpenInOtherRequested;
     public Func<string?>? CurrentPathProvider;
 
-    public FavoritesArea(List<FavoriteBarData> bars)
+    public DrivesBarData DrivesBar { get; }
+    readonly System.Windows.Forms.Timer driveWatch = new() { Interval = 3000 };
+    string driveSignature = "";
+
+    public FavoritesArea(List<FavoriteBarData> bars, DrivesBarData drives)
     {
         Bars = bars;
+        DrivesBar = drives;
         Dock = DockStyle.Top;
+        // Détecte l'arrivée d'une clé USB ou d'un lecteur mappé (vérification très légère).
+        driveWatch.Tick += (_, _) =>
+        {
+            var sig = Drives.Signature();
+            if (sig != driveSignature) Rebuild();
+        };
         RebuildNow();
     }
 
@@ -45,6 +56,15 @@ internal sealed class FavoritesArea : Panel
 
         var visible = Bars.Where(b => b.Visible).ToList();
         int height = 0;
+        // Barre des lecteurs : ajoutée en premier, elle se retrouve en bas de la pile.
+        if (DrivesBar.Visible)
+        {
+            driveSignature = Drives.Signature();
+            var drives = new DrivesBar(this, DrivesBar) { Dock = DockStyle.Top };
+            Controls.Add(drives);
+            height += drives.GetPreferredSize(Size.Empty).Height;
+        }
+        driveWatch.Enabled = DrivesBar.Visible;
         // Les contrôles ancrés en haut s'empilent à l'envers de l'ordre d'ajout.
         for (int i = visible.Count - 1; i >= 0; i--)
         {
@@ -83,6 +103,34 @@ internal sealed class FavoritesArea : Panel
         bar.Items.Add(new Favorite { Name = name, Path = path });
         bar.Visible = true;
         Rebuild();
+    }
+
+    public void SetDrivesBarVisible(bool visible)
+    {
+        DrivesBar.Visible = visible;
+        Rebuild();
+    }
+
+    /// <summary>Ajoute à une barre de favoris tous les lecteurs réseau mappés qui n'y sont pas déjà.</summary>
+    public void AddNetworkDrives(FavoriteBarData bar)
+    {
+        var drives = Drives.List(networkOnly: true);
+        if (drives.Count == 0)
+        {
+            MessageBox.Show(FindForm(), "Aucun lecteur réseau mappé.", Dialogs.AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        foreach (var d in drives)
+            if (!bar.Items.Any(f => FileEntry.PathEquals(f.Path, d.Root)))
+                bar.Items.Add(new Favorite { Name = d.Label, Path = d.Root });
+        bar.Visible = true;
+        Rebuild();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) driveWatch.Dispose();
+        base.Dispose(disposing);
     }
 
     public void OpenAt(int index, bool newTab)
@@ -167,6 +215,7 @@ internal sealed class FavoritesBar : ToolStrip
 
         // Menu de la barre (bouton à gauche, ou clic droit dans le vide).
         AddBarMenu("Ajouter le dossier courant ici", () => { if (area.CurrentPath is { } p) area.AddToBar(data, p); });
+        AddBarMenu("Ajouter les lecteurs réseau mappés ici", () => area.AddNetworkDrives(data));
         barMenu.Items.Add(new ToolStripSeparator());
         AddBarMenu("Nouvelle barre de favoris…", area.NewBar);
         AddBarMenu("Renommer cette barre…", () => area.RenameBar(data));

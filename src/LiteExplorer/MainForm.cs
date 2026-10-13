@@ -40,7 +40,7 @@ internal sealed class MainForm : Form, IExplorerHost, IThemed
         right = new FilePane(this) { Dock = DockStyle.Fill };
         active = left;
 
-        favorites = new FavoritesArea(settings.FavoriteBars);
+        favorites = new FavoritesArea(settings.FavoriteBars, settings.DrivesBar);
         favorites.OpenRequested += (path, newTab) =>
         {
             if (newTab) active.AddTab(path, select: !ModifierKeys.HasFlag(Keys.Shift));
@@ -177,7 +177,18 @@ internal sealed class MainForm : Form, IExplorerHost, IThemed
             favMenu.DropDownItems.Add(Item("Ajouter le dossier courant", "Ctrl+D", () => { if (V != null) AddFavorite(V.CurrentPath); }));
             favMenu.DropDownItems.Add(Item("Nouvelle barre de favoris…", null, favorites.NewBar));
             favMenu.DropDownItems.Add(new ToolStripSeparator());
-            favMenu.DropDownItems.Add(new ToolStripMenuItem("Barres affichées :") { Enabled = false });
+            var drivesItem = new ToolStripMenuItem("Barre des lecteurs") { Checked = favorites.DrivesBar.Visible };
+            drivesItem.Click += (_, _) => favorites.SetDrivesBarVisible(!favorites.DrivesBar.Visible);
+            favMenu.DropDownItems.Add(drivesItem);
+            var networkOnly = new ToolStripMenuItem("    Lecteurs réseau seulement")
+            {
+                Checked = favorites.DrivesBar.NetworkOnly,
+                Enabled = favorites.DrivesBar.Visible,
+            };
+            networkOnly.Click += (_, _) => { favorites.DrivesBar.NetworkOnly = !favorites.DrivesBar.NetworkOnly; favorites.Rebuild(); };
+            favMenu.DropDownItems.Add(networkOnly);
+            favMenu.DropDownItems.Add(new ToolStripSeparator());
+            favMenu.DropDownItems.Add(new ToolStripMenuItem("Barres de favoris affichées :") { Enabled = false });
             foreach (var bar in favorites.Bars)
             {
                 var b = bar;
@@ -390,6 +401,7 @@ internal sealed class MainForm : Form, IExplorerHost, IThemed
         if (treeMode == TreeMode.Shared) settings.SharedTreeWidth = treeSplit.SplitterDistance;
         if (treeMode == TreeMode.PerPane) settings.PaneTreeWidth = left.TreeWidth;
         settings.FavoriteBars = favorites.Bars;
+        settings.DrivesBar = favorites.DrivesBar;
         settings.SplitRatio = split.Width > 0 ? (double)split.SplitterDistance / split.Width : 0.5;
         var b = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
         (settings.WinX, settings.WinY, settings.WinW, settings.WinH) = (b.X, b.Y, b.Width, b.Height);

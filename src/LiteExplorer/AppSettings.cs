@@ -14,6 +14,12 @@ internal sealed class Favorite
     public string Path { get; set; } = "";
 }
 
+internal sealed class DrivesBarData
+{
+    public bool Visible { get; set; }
+    public bool NetworkOnly { get; set; }
+}
+
 internal sealed class FavoriteBarData
 {
     public string Name { get; set; } = "Favoris";
@@ -28,6 +34,7 @@ internal sealed class FavoriteBarData
 internal sealed class AppSettings
 {
     public List<FavoriteBarData> FavoriteBars { get; set; } = new();
+    public DrivesBarData DrivesBar { get; set; } = new();
     /// <summary>Ancien format (une seule barre) : lu pour la migration, plus écrit.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<Favorite>? Favorites { get; set; }

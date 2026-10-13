@@ -91,6 +91,16 @@ sur un dossier de l'arbre (mêmes règles copier/déplacer que dans la liste). L
 - La première barre affichée est la barre par défaut : Ctrl+D y ajoute le dossier courant, Ctrl+1…9 ouvre ses favoris.
 - Clic droit sur un favori : renommer, réordonner, **déplacer vers une autre barre**, supprimer.
 
+### Barre des lecteurs
+
+Menu **Favoris → Barre des lecteurs** : une barre générée automatiquement avec un bouton par lecteur
+(option **Lecteurs réseau seulement** pour n'afficher que les lecteurs mappés, ex. `Z: Projets`, avec le
+chemin `\\serveur\partage` en info-bulle). Elle se met à jour toute seule quand une clé USB ou un lecteur
+mappé apparaît ou disparaît.
+
+Pour mettre les lecteurs dans une barre de favoris : clic droit sur un lecteur → **Ajouter à la barre**,
+ou dans le menu ☆ d'une barre → **Ajouter les lecteurs réseau mappés ici** (tous d'un coup).
+
 ## Réglages
 
 Favoris, onglets ouverts, taille de la fenêtre, etc. sont enregistrés dans
@@ -119,6 +129,7 @@ Windows Registry Editor Version 5.00
 | `FilePane.cs` | Un panneau = une rangée d'onglets dessinés à la main (`+`, `×`) |
 | `FolderView.cs` | Contenu d'un onglet : adresse, filtre, liste virtuelle, historique, glisser-déposer, menus |
 | `FavoritesBar.cs` | Barres de favoris |
+| `DrivesBar.cs` | Barre des lecteurs (dont lecteurs réseau mappés, chemin UNC) |
 | `FolderTree.cs` | Arborescence des dossiers (chargée à la demande) |
 | `FileOps.cs` | Copier / déplacer / supprimer via les dialogues natifs |
 | `ShellIcons.cs` | Icônes et types de fichiers système, mis en cache |
