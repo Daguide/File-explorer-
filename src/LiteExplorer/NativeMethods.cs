@@ -107,5 +107,17 @@ internal static class NativeMethods
     public static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
     public const int LVM_GETEDITCONTROL = 0x1018;
+    public const int LVM_GETHEADER = 0x101F;
+
+    [DllImport("dwmapi.dll")]
+    static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+
+    /// <summary>Barre de titre sombre (Windows 10 20H1+ = 20, versions antérieures = 19).</summary>
+    public static void SetDarkTitleBar(IntPtr hwnd, bool dark)
+    {
+        int v = dark ? 1 : 0;
+        if (DwmSetWindowAttribute(hwnd, 20, ref v, sizeof(int)) != 0)
+            DwmSetWindowAttribute(hwnd, 19, ref v, sizeof(int));
+    }
     public const int EM_SETSEL = 0xB1;
 }

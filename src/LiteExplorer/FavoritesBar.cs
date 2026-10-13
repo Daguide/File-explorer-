@@ -17,7 +17,6 @@ internal sealed class FavoritesBar : ToolStrip
     {
         Favorites = favorites;
         GripStyle = ToolStripGripStyle.Hidden;
-        RenderMode = ToolStripRenderMode.System;
         ImageScalingSize = ShellIcons.List.ImageSize;
         ShowItemToolTips = true;
         AllowDrop = true;

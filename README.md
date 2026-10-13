@@ -5,6 +5,7 @@ Remplaçant léger de l'Explorateur Windows, écrit en C# (WinForms, .NET 8).
 - **Double panneau** côte à côte (Tab pour passer de l'un à l'autre)
 - **Onglets façon fureteur Web** dans chaque panneau : `+`, `×`, clic milieu, Ctrl+T / Ctrl+W / Ctrl+Maj+T
 - **Barre de favoris** : clic pour ouvrir, clic milieu pour un nouvel onglet, glisser un dossier dessus pour l'ajouter
+- **Thème clair / sombre** (ou selon Windows) : menu *Affichage → Thème*
 - **Aucune dépendance externe** : seulement .NET et les API de Windows. Pas de DLL tierce, pas de télémétrie,
   pas d'accès réseau. Tout le code est là, lisible (contrairement à Clover…).
 
@@ -53,6 +54,13 @@ produit `LiteExplorer.exe` à chaque push (onglet *Actions* → artefact `LiteEx
 Glisser-déposer entre les panneaux et avec l'Explorateur/le Bureau : déplacement sur le même disque,
 copie entre disques, Ctrl force la copie, Maj force le déplacement.
 
+## Thèmes
+
+Menu **Affichage → Thème** : *Selon Windows* (suit le réglage « mode des applications » de Windows,
+y compris quand il change pendant que l'app est ouverte), *Clair* ou *Sombre*. Le choix est mémorisé.
+En sombre : barre de titre, onglets, en-têtes de colonnes, barres de défilement et menus sont sombres
+(Windows 10 1809 ou plus récent).
+
 ## Réglages
 
 Favoris, onglets ouverts, taille de la fenêtre, etc. sont enregistrés dans
@@ -83,6 +91,7 @@ Windows Registry Editor Version 5.00
 | `FavoritesBar.cs` | Barre de favoris |
 | `FileOps.cs` | Copier / déplacer / supprimer via les dialogues natifs |
 | `ShellIcons.cs` | Icônes et types de fichiers système, mis en cache |
+| `Theme.cs` | Palettes clair/sombre, application du thème, rendu sombre des menus |
 | `AppSettings.cs` | Réglages JSON |
 | `NativeMethods.cs` | Appels Win32 |
 
@@ -91,5 +100,4 @@ Windows Registry Editor Version 5.00
 - Menu contextuel complet de Windows (7-Zip, Git, etc.) via `IContextMenu`
 - Fil d'Ariane cliquable dans la barre d'adresse
 - Réorganiser les onglets par glisser-déposer
-- Thème sombre
 - Aperçu des images / fichiers texte

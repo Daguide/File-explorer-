@@ -25,6 +25,8 @@ internal sealed class AppSettings
     public List<string> RightTabs { get; set; } = new();
     public int RightIndex { get; set; }
     public bool ShowHidden { get; set; }
+    /// <summary>System, Light ou Dark.</summary>
+    public string Theme { get; set; } = "System";
     public double SplitRatio { get; set; } = 0.5;
     public int WinX { get; set; }
     public int WinY { get; set; }

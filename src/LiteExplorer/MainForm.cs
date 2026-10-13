@@ -1,6 +1,8 @@
+using Microsoft.Win32;
+
 namespace LiteExplorer;
 
-internal sealed class MainForm : Form, IExplorerHost
+internal sealed class MainForm : Form, IExplorerHost, IThemed
 {
     readonly AppSettings settings;
     readonly string[] args;
@@ -14,6 +16,7 @@ internal sealed class MainForm : Form, IExplorerHost
         this.args = args;
         settings = AppSettings.Load();
         AppState.ShowHidden = settings.ShowHidden;
+        ThemeManager.SetMode(Enum.TryParse<ThemeMode>(settings.Theme, out var mode) ? mode : ThemeMode.System);
 
         Text = Dialogs.AppName;
         Font = SystemFonts.MessageBoxFont ?? Font;
@@ -43,6 +46,11 @@ internal sealed class MainForm : Form, IExplorerHost
         Controls.Add(split);
         Controls.Add(BuildFunctionBar());
         Controls.Add(favorites);
+        Controls.Add(BuildMenu());
+
+        ThemeManager.Apply(this);
+        ThemeManager.Changed += OnThemeManagerChanged;
+        SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
 
         RestoreWindow();
     }
@@ -74,11 +82,93 @@ internal sealed class MainForm : Form, IExplorerHost
         {
             bar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / defs.Length));
             var b = new Button { Text = text, Dock = DockStyle.Fill, FlatStyle = FlatStyle.Flat, TabStop = false, Margin = new Padding(1) };
-            b.FlatAppearance.BorderColor = SystemColors.ControlDark;
             b.Click += (_, _) => { V?.FocusList(); action(); };
             bar.Controls.Add(b);
         }
         return bar;
+    }
+
+    MenuStrip BuildMenu()
+    {
+        var menu = new MenuStrip { Dock = DockStyle.Top, Padding = new Padding(4, 2, 0, 2) };
+        MainMenuStrip = menu;
+
+        static ToolStripMenuItem Item(string text, string? keys, Action action)
+        {
+            var it = new ToolStripMenuItem(text) { ShortcutKeyDisplayString = keys };
+            it.Click += (_, _) => action();
+            return it;
+        }
+
+        var file = new ToolStripMenuItem("&Fichier");
+        file.DropDownItems.AddRange(new ToolStripItem[]
+        {
+            Item("Nouvel onglet", "Ctrl+T", () => active.AddTab(V?.CurrentPath ?? "").FocusList()),
+            Item("Rouvrir l'onglet fermé", "Ctrl+Maj+T", () => active.ReopenClosed()),
+            Item("Fermer l'onglet", "Ctrl+W", () => active.CloseCurrent()),
+            new ToolStripSeparator(),
+            Item("Nouveau dossier", "F7", () => V?.NewFolder()),
+            Item("Ouvrir un terminal ici", null, () => V?.OpenTerminal()),
+            new ToolStripSeparator(),
+            Item("Quitter", "Alt+F4", Close),
+        });
+
+        var themeMenu = new ToolStripMenuItem("&Thème");
+        foreach (var (label, m) in new[] { ("Selon Windows", ThemeMode.System), ("Clair", ThemeMode.Light), ("Sombre", ThemeMode.Dark) })
+        {
+            var it = new ToolStripMenuItem(label) { Tag = m };
+            it.Click += (_, _) => ThemeManager.SetMode(m);
+            themeMenu.DropDownItems.Add(it);
+        }
+        themeMenu.DropDownOpening += (_, _) =>
+        {
+            foreach (ToolStripMenuItem it in themeMenu.DropDownItems)
+                it.Checked = (ThemeMode)it.Tag! == ThemeManager.Mode;
+        };
+
+        var hidden = Item("Fichiers cachés", "Ctrl+H", ToggleHidden);
+        var view = new ToolStripMenuItem("&Affichage");
+        view.DropDownItems.AddRange(new ToolStripItem[]
+        {
+            themeMenu,
+            new ToolStripSeparator(),
+            hidden,
+            Item("Échanger les panneaux", "Ctrl+U", SwapPanes),
+            Item("Actualiser", "Ctrl+R", () => V?.ReloadView()),
+        });
+        view.DropDownOpening += (_, _) => hidden.Checked = AppState.ShowHidden;
+
+        menu.Items.AddRange(new ToolStripItem[] { file, view });
+        return menu;
+    }
+
+    // --- Thème ----------------------------------------------------------------
+
+    void OnThemeManagerChanged(object? sender, EventArgs e) => ThemeManager.Apply(this);
+
+    public void OnThemeChanged(Theme theme)
+    {
+        split.BackColor = theme.Border; // couleur du séparateur
+        if (IsHandleCreated) NativeMethods.SetDarkTitleBar(Handle, theme.Dark);
+    }
+
+    void OnUserPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e)
+    {
+        if (ThemeManager.Mode != ThemeMode.System || e.Category != UserPreferenceCategory.General) return;
+        if (IsHandleCreated) BeginInvoke(new Action(ThemeManager.Refresh));
+    }
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        NativeMethods.SetDarkTitleBar(Handle, ThemeManager.Current.Dark);
+    }
+
+    protected override void OnFormClosed(FormClosedEventArgs e)
+    {
+        SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+        ThemeManager.Changed -= OnThemeManagerChanged;
+        base.OnFormClosed(e);
     }
 
     // --- IExplorerHost -------------------------------------------------------
@@ -211,6 +301,7 @@ internal sealed class MainForm : Form, IExplorerHost
         settings.RightTabs = right.TabPaths().ToList();
         settings.RightIndex = right.SelectedIndex;
         settings.ShowHidden = AppState.ShowHidden;
+        settings.Theme = ThemeManager.Mode.ToString();
         settings.Favorites = favorites.Favorites;
         settings.SplitRatio = split.Width > 0 ? (double)split.SplitterDistance / split.Width : 0.5;
         var b = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;

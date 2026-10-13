@@ -4,10 +4,32 @@ namespace LiteExplorer;
 /// Un panneau = une rangée d'onglets façon fureteur Web.
 /// Bouton « + » pour ouvrir un onglet, « × » ou clic milieu pour le fermer.
 /// </summary>
-internal sealed class FilePane : UserControl
+/// <summary>
+/// TabControl entièrement dessiné par nous (fond + onglets), sinon Windows
+/// peint la bande d'onglets en clair, même en thème sombre.
+/// </summary>
+internal sealed class ThemedTabControl : TabControl
+{
+    public Action<Graphics, int>? DrawTabItem;
+
+    public ThemedTabControl()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        using (var back = new SolidBrush(ThemeManager.Current.Panel))
+            e.Graphics.FillRectangle(back, ClientRectangle);
+        for (int i = 0; i < TabCount; i++) DrawTabItem?.Invoke(e.Graphics, i);
+    }
+}
+
+internal sealed class FilePane : UserControl, IThemed
 {
     readonly IExplorerHost host;
-    readonly TabControl tabs = new();
+    readonly ThemedTabControl tabs = new();
     readonly TabPage plusPage = new("+") { ToolTipText = "Nouvel onglet (Ctrl+T)" };
     readonly ContextMenuStrip tabMenu = new();
     readonly Stack<string> closedTabs = new();
@@ -18,14 +40,13 @@ internal sealed class FilePane : UserControl
     {
         this.host = host;
         tabs.Dock = DockStyle.Fill;
-        tabs.DrawMode = TabDrawMode.OwnerDrawFixed;
         tabs.Padding = new Point(14, 4);
         tabs.ShowToolTips = true;
         Controls.Add(tabs);
         _ = tabs.Handle; // sinon TabPages.Insert est ignoré avant la création du handle
         tabs.TabPages.Add(plusPage);
 
-        tabs.DrawItem += DrawTab;
+        tabs.DrawTabItem = DrawTab;
         tabs.MouseDown += TabMouseDown;
         tabs.MouseDoubleClick += (_, e) => { if (HitTab(e.Location) < 0) AddTab(Current?.CurrentPath ?? "").FocusList(); };
         tabs.Selecting += (_, e) =>
@@ -99,8 +120,9 @@ internal sealed class FilePane : UserControl
     public FolderView AddTab(string path, bool select = true, int index = -1, bool quiet = false)
     {
         var view = new FolderView(host, this) { Dock = DockStyle.Fill };
-        var page = new TabPage("…") { Padding = Padding.Empty };
+        var page = new TabPage("…") { Padding = Padding.Empty, UseVisualStyleBackColor = false };
         page.Controls.Add(view);
+        ThemeManager.Apply(page);
         view.SetActive(isActive);
         view.PathChanged += (_, _) =>
         {
@@ -193,42 +215,49 @@ internal sealed class FilePane : UserControl
         BeginInvoke(new Action(() => Current?.FocusList()));
     }
 
-    void DrawTab(object? sender, DrawItemEventArgs e)
-    {
-        // Pendant TabPages.Insert, Windows peut demander à dessiner un onglet natif
-        // que la collection .NET ne contient pas encore : on l'ignore, on redessinera après.
-        if (e.Index < 0 || e.Index >= tabs.TabPages.Count) return;
-        var page = tabs.TabPages[e.Index];
-        var r = tabs.GetTabRect(e.Index);
-        bool selected = e.Index == tabs.SelectedIndex;
-        var g = e.Graphics;
+    public void OnThemeChanged(Theme theme) => tabs.Invalidate();
 
-        using (var back = new SolidBrush(selected ? SystemColors.Window : SystemColors.Control))
+    void DrawTab(Graphics g, int index)
+    {
+        if (index < 0 || index >= tabs.TabPages.Count) return;
+        var t = ThemeManager.Current;
+        var page = tabs.TabPages[index];
+        var r = tabs.GetTabRect(index);
+        bool selected = index == tabs.SelectedIndex;
+
+        using (var back = new SolidBrush(selected ? t.Back : t.Panel))
             g.FillRectangle(back, r);
+        if (!selected)
+            using (var sep = new Pen(t.Border))
+                g.DrawLine(sep, r.Right - 1, r.Top + 6, r.Right - 1, r.Bottom - 6);
 
         if (page == plusPage)
         {
             using var bold = new Font(tabs.Font.FontFamily, tabs.Font.Size + 2, FontStyle.Bold);
-            TextRenderer.DrawText(g, "+", bold, r, SystemColors.ControlText,
+            TextRenderer.DrawText(g, "+", bold, r, t.Fore,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             return;
         }
 
-        if (selected && isActive)
-            using (var accent = new SolidBrush(SystemColors.Highlight))
+        if (selected)
+            using (var accent = new SolidBrush(isActive ? t.Accent : t.Border))
                 g.FillRectangle(accent, r.X, r.Y, r.Width, 3);
 
         var textRect = new Rectangle(r.X + 6, r.Y, r.Width - 26, r.Height);
-        TextRenderer.DrawText(g, page.Text, tabs.Font, textRect, SystemColors.ControlText,
+        TextRenderer.DrawText(g, page.Text, tabs.Font, textRect, selected ? t.Fore : t.Gray,
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis |
             TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
 
         var c = CloseRect(r);
         const int m = 4;
+        var smoothing = g.SmoothingMode;
         g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-        using var pen = new Pen(selected ? SystemColors.ControlDarkDark : SystemColors.GrayText, 1.5f);
-        g.DrawLine(pen, c.Left + m, c.Top + m, c.Right - m, c.Bottom - m);
-        g.DrawLine(pen, c.Right - m, c.Top + m, c.Left + m, c.Bottom - m);
+        using (var pen = new Pen(selected ? t.Fore : t.Gray, 1.5f))
+        {
+            g.DrawLine(pen, c.Left + m, c.Top + m, c.Right - m, c.Bottom - m);
+            g.DrawLine(pen, c.Right - m, c.Top + m, c.Left + m, c.Bottom - m);
+        }
+        g.SmoothingMode = smoothing;
     }
 
     protected override void Dispose(bool disposing)

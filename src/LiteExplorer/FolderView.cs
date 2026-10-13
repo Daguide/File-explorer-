@@ -8,14 +8,70 @@ namespace LiteExplorer;
 
 internal sealed class FileListView : ListView
 {
-    public FileListView() => DoubleBuffered = true;
+    const int WM_LBUTTONDBLCLK = 0x203;
+
+    /// <summary>Double-clic hors de tout élément (la ListView ne lève pas MouseDoubleClick dans ce cas).</summary>
+    public event EventHandler? EmptyAreaDoubleClick;
+
+    public FileListView()
+    {
+        DoubleBuffered = true;
+        // On dessine nous-mêmes les en-têtes (pour le thème sombre), le reste reste natif.
+        OwnerDraw = true;
+        DrawItem += (_, e) => e.DrawDefault = true;
+        DrawSubItem += (_, e) => e.DrawDefault = true;
+        DrawColumnHeader += OnDrawHeader;
+        HandleCreated += (_, _) => ApplyNativeTheme();
+    }
+
+    public void ApplyNativeTheme()
+    {
+        if (!IsHandleCreated) return;
+        bool dark = ThemeManager.Current.Dark;
+        // DarkMode_Explorer : barres de défilement et sélection sombres (Windows 10 1809+).
+        NativeMethods.SetWindowTheme(Handle, dark ? "DarkMode_Explorer" : "Explorer", null);
+        var header = NativeMethods.SendMessage(Handle, NativeMethods.LVM_GETHEADER, IntPtr.Zero, IntPtr.Zero);
+        if (header != IntPtr.Zero)
+            NativeMethods.SetWindowTheme(header, dark ? "DarkMode_ItemsView" : "Explorer", null);
+        Invalidate();
+    }
+
+    void OnDrawHeader(object? sender, DrawListViewColumnHeaderEventArgs e)
+    {
+        var t = ThemeManager.Current;
+        var g = e.Graphics;
+        using (var back = new SolidBrush(t.Header)) g.FillRectangle(back, e.Bounds);
+        using (var pen = new Pen(t.Border))
+        {
+            g.DrawLine(pen, e.Bounds.Right - 1, e.Bounds.Top + 4, e.Bounds.Right - 1, e.Bounds.Bottom - 5);
+            g.DrawLine(pen, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
+        }
+        var align = e.Header?.TextAlign == HorizontalAlignment.Right ? TextFormatFlags.Right : TextFormatFlags.Left;
+        TextRenderer.DrawText(g, e.Header?.Text, Font, Rectangle.Inflate(e.Bounds, -6, 0), t.Fore,
+            align | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
+    }
+
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == WM_LBUTTONDBLCLK)
+        {
+            int lp = (int)(long)m.LParam;
+            var pt = new Point((short)(lp & 0xFFFF), (short)((lp >> 16) & 0xFFFF));
+            if (HitTest(pt).Item == null)
+            {
+                EmptyAreaDoubleClick?.Invoke(this, EventArgs.Empty);
+                return;
+            }
+        }
+        base.WndProc(ref m);
+    }
 }
 
 /// <summary>
 /// Contenu d'un onglet : barre d'adresse, liste virtuelle des fichiers,
 /// historique Précédent/Suivant et surveillance du dossier.
 /// </summary>
-internal sealed class FolderView : UserControl
+internal sealed class FolderView : UserControl, IThemed
 {
     readonly IExplorerHost host;
     public FilePane Pane { get; }
@@ -41,7 +97,7 @@ internal sealed class FolderView : UserControl
     string? freeInfo, loadError;
     int sortColumn;
     bool sortAsc = true;
-    bool initialized, editing, statusPending, suppressFilter, dirty;
+    bool initialized, editing, statusPending, suppressFilter, dirty, isActive;
     string filterText = "";
     Regex? filterRegex;
 
@@ -74,18 +130,19 @@ internal sealed class FolderView : UserControl
         var btnRefresh = NavButton("", "Actualiser (Ctrl+R)", ReloadView, glyphs);
         nav.Items.AddRange(new ToolStripItem[] { btnBack, btnForward, btnUp, btnRefresh });
         nav.GripStyle = ToolStripGripStyle.Hidden;
-        nav.RenderMode = ToolStripRenderMode.System;
         nav.CanOverflow = false;
         nav.Dock = DockStyle.Left;
         nav.Padding = Padding.Empty;
 
         address.Dock = DockStyle.Fill;
+        address.BorderStyle = BorderStyle.FixedSingle;
         address.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
         address.AutoCompleteSource = AutoCompleteSource.FileSystemDirectories;
         address.KeyDown += AddressKeyDown;
         address.Enter += (_, _) => { host.SetActivePane(Pane); BeginInvoke(new Action(address.SelectAll)); };
 
         filter.Dock = DockStyle.Right;
+        filter.BorderStyle = BorderStyle.FixedSingle;
         filter.Width = 150;
         filter.PlaceholderText = "Filtrer (ex. *.pdf)";
         filter.TextChanged += (_, _) => OnFilterChanged();
@@ -100,7 +157,6 @@ internal sealed class FolderView : UserControl
 
         accent.Dock = DockStyle.Top;
         accent.Height = 2;
-        accent.BackColor = SystemColors.Control;
 
         status.Dock = DockStyle.Bottom;
         status.AutoSize = false;
@@ -128,7 +184,7 @@ internal sealed class FolderView : UserControl
         list.ContextMenuStrip = menu;
         UpdateHeaders();
 
-        list.HandleCreated += (_, _) => NativeMethods.SetWindowTheme(list.Handle, "Explorer", null);
+        list.EmptyAreaDoubleClick += (_, _) => GoUp(); // double-clic dans le vide = dossier parent
         list.RetrieveVirtualItem += OnRetrieveItem;
         list.SearchForVirtualItem += OnSearchItem;
         list.ColumnClick += OnColumnClick;
@@ -271,8 +327,18 @@ internal sealed class FolderView : UserControl
     public void FocusAddress() { address.Focus(); address.SelectAll(); }
     public void FocusFilter() { filter.Focus(); filter.SelectAll(); }
 
-    public void SetActive(bool active) =>
-        accent.BackColor = active ? SystemColors.Highlight : SystemColors.Control;
+    public void SetActive(bool active)
+    {
+        isActive = active;
+        accent.BackColor = active ? ThemeManager.Current.Accent : ThemeManager.Current.Panel;
+    }
+
+    public void OnThemeChanged(Theme theme)
+    {
+        SetActive(isActive);
+        status.ForeColor = theme.Gray;
+        list.ApplyNativeTheme();
+    }
 
     // =====================================================================
     // Chargement
@@ -560,7 +626,7 @@ internal sealed class FolderView : UserControl
         item.SubItems.Add(en.Kind is EntryKind.File or EntryKind.Drive ? FileEntry.FormatSize(en.Size) : "");
         item.SubItems.Add(ShellIcons.TypeName(en));
         item.SubItems.Add(en.Modified is DateTime d ? d.ToString("g") : "");
-        if ((en.Attributes & FileAttributes.Hidden) != 0) item.ForeColor = SystemColors.GrayText;
+        if ((en.Attributes & FileAttributes.Hidden) != 0) item.ForeColor = ThemeManager.Current.Gray;
         e.Item = item;
     }
 
@@ -669,8 +735,7 @@ internal sealed class FolderView : UserControl
     {
         if (e.Button != MouseButtons.Left) return;
         var hit = list.HitTest(e.Location).Item;
-        if (hit == null) { GoUp(); return; } // double-clic dans le vide = dossier parent
-        if (hit.Index < view.Count) OpenEntry(view[hit.Index]);
+        if (hit != null && hit.Index < view.Count) OpenEntry(view[hit.Index]);
     }
 
     void ListMouseDown(object? sender, MouseEventArgs e)
